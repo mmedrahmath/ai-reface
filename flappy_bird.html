@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Floppy Square</title>
+    <!-- Load a retro gaming font -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        /* Custom CSS for a game feel */
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #3f3f3f; /* Dark background */
+            font-family: 'Press Start 2P', cursive;
+            user-select: none;
+            overflow: hidden;
+        }
+
+        .game-container {
+            position: relative;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+            border: 8px solid #a3e635; /* Neon green border */
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        #gameCanvas {
+            display: block;
+            background-color: #70c5ce; /* Sky blue */
+        }
+
+        .game-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(0, 0, 0, 0.85); /* Darker overlay for settings */
+            color: white;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+            z-index: 10;
+        }
+
+        .game-overlay h2 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #ffcc00; /* Yellow */
+            text-shadow: 2px 2px 0px #000;
+        }
+
+        .game-overlay p {
+            font-size: 0.7rem;
+            margin-bottom: 30px;
+        }
+
+        /* Styling for the main action buttons (Start/Restart) */
+        .start-button, .restart-button {
+            padding: 10px 20px;
+            background-color: #f59e0b;
+            color: black;
+            border: 4px solid #92400e;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.8rem;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        .start-button:hover, .restart-button:hover {
+            background-color: #fbbf24;
+            box-shadow: 0 0 10px rgba(255, 255, 0, 0.5);
+        }
+
+        .start-button:active, .restart-button:active {
+            transform: translateY(2px);
+            box-shadow: none;
+        }
+        
+        /* New Styles for Settings Button (gear icon) */
+        #settingsButton {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            z-index: 20;
+            padding: 5px;
+            color: #fff;
+            text-shadow: 1px 1px #000;
+        }
+
+        /* New Styles for Settings Panel buttons */
+        #gameSettingsOverlay button {
+            padding: 8px 15px;
+            margin: 5px;
+            background-color: #3b82f6;
+            color: white;
+            border: 2px solid #1e40af;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.6rem;
+            transition: background-color 0.1s;
+            white-space: nowrap;
+        }
+
+        .setting-group {
+            margin-bottom: 20px;
+            padding: 10px;
+            border: 1px dashed #aaa;
+            border-radius: 5px;
+        }
+
+        .setting-group label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 0.8rem;
+            color: #a3e635;
+        }
+        
+        /* Highlight the currently selected option */
+        .selected-setting {
+            background-color: #a3e635 !important;
+            color: black !important;
+            border: 2px solid #4d7c0f !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <canvas id="gameCanvas" width="300" height="500"></canvas>
+        
+        <!-- Settings Button -->
+        <button id="settingsButton" onclick="openSettings()">⚙️</button>
+
+        <!-- UI Overlay for Start -->
+        <div id="gameStartOverlay" class="game-overlay">
+            <h2>FLOOPY SQUARE</h2>
+            <p>Press the spacebar to fly, or tap the screen!</p>
+            <button class="start-button" onclick="startGame()">START GAME</button>
+        </div>
+        
+        <!-- New Settings Overlay -->
+        <div id="gameSettingsOverlay" class="game-overlay" style="display: none;">
+            <h2>SETTINGS</h2>
+
+            <div class="setting-group">
+                <label>SELECT BIRD:</label>
+                <button onclick="setBirdTheme('square')">◼️ Default</button>
+                <button onclick="setBirdTheme('tomato')">🍅 Tomato</button>
+                <button onclick="setBirdTheme('bear')">🐻 Bear</button>
+                <button onclick="setBirdTheme('mobile')">📱 Mobile</button>
+            </div>
+
+            <div class="setting-group">
+                <label>JUMP ACTION:</label>
+                <button id="jumpUpBtn" onclick="setJumpDirection(false)">⬆️ Jumps Up (Classic)</button>
+                <button id="jumpDownBtn" onclick="setJumpDirection(true)">⬇️ Jumps Down (Inverted)</button>
+            </div>
+            
+            <!-- Button used for closing or restarting, handled by JS logic -->
+            <button id="settingsCloseButton" class="start-button" onclick="closeSettings()">CLOSE</button>
+        </div>
+
+        <!-- UI Overlay for Game Over (Updated for LLM Features) -->
+        <div id="gameOverOverlay" class="game-overlay" style="display: none;">
+            <h2>GAME OVER</h2>
+            <p id="finalScoreText"></p>
+            
+            <!-- LLM Feature 1: AI Pro Tip -->
+            <div id="geminiTipContainer" style="display:none; max-width: 90%; margin-top: 15px; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; border: 1px solid #ffcc00;">
+                <p style="font-size: 0.75rem; color: #ffcc00; margin-bottom: 5px;">✨ AI Pro Tip:</p>
+                <p id="geminiTipText" style="font-size: 0.6rem; color: #fff; margin-bottom: 5px;"></p>
+                <div id="geminiTipSources" style="font-size: 0.45rem; text-align: left; color: #aaa;"></div>
+            </div>
+            
+            <p id="loadingTip" style="display: none; font-size: 0.7rem; color: #a3e635;">Loading Pro Tip... 🧠</p>
+            
+            <!-- LLM Feature 2: TTS Read Score -->
+            <button id="ttsButton" class="start-button" onclick="playGameOverSpeech()" style="margin-top: 20px;">🔊 Read Score</button>
+            
+            <button class="restart-button" onclick="resetGame()" style="margin-top: 10px;">PLAY AGAIN</button>
+        </div>
+    </div>
+
+    <script>
+        // --- GEMINI API UTILITIES (Required for LLM and TTS features) ---
+
+        // API Key (Canvas handles this, leave blank)
+        const apiKey = ""; 
+
+        // Utility function to convert Base64 string to ArrayBuffer (for audio)
+        function base64ToArrayBuffer(base64) {
+            const binaryString = atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        // Utility function to convert PCM audio data to WAV Blob (for audio playback)
+        function pcmToWav(pcm16, sampleRate) {
+            const numChannels = 1;
+            const numSamples = pcm16.length;
+            const buffer = new ArrayBuffer(44 + numSamples * 2);
+            const view = new DataView(buffer);
+
+            // Write WAV file header
+            let offset = 0;
+            const writeString = (str) => { for (let i = 0; i < str.length; i++) { view.setUint8(offset + i, str.charCodeAt(i)); } offset += str.length; };
+            const writeUint32 = (val) => { view.setUint32(offset, val, true); offset += 4; };
+            const writeUint16 = (val) => { view.setUint16(offset, val, true); offset += 2; };
+
+            writeString('RIFF'); // Chunk ID
+            writeUint32(36 + numSamples * 2); // Chunk Size
+            writeString('WAVE'); // Format
+            writeString('fmt '); // Sub-chunk 1 ID
+            writeUint32(16); // Sub-chunk 1 Size (16 for PCM)
+            writeUint16(1); // Audio Format (1 for PCM)
+            writeUint16(numChannels); // Number of Channels
+            writeUint32(sampleRate); // Sample Rate
+            writeUint32(sampleRate * numChannels * 2); // Byte Rate (SampleRate * NumChannels * 2)
+            writeUint16(numChannels * 2); // Block Align (NumChannels * 2)
+            writeUint16(16); // Bits per Sample
+
+            writeString('data'); // Sub-chunk 2 ID
+            writeUint32(numSamples * 2); // Sub-chunk 2 Size
+
+            // Write PCM data
+            for (let i = 0; i < numSamples; i++) {
+                view.setInt16(offset, pcm16[i], true);
+                offset += 2;
+            }
+
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+        
+        // Generic function to call the Gemini API
+        async function callGeminiApi(model, payload) {
+            let attempt = 0;
+            const maxAttempts = 5;
+            const initialDelay = 1000; // 1 second
+
+            while (attempt < maxAttempts) {
+                try {
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+                    
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.status === 429 && attempt < maxAttempts - 1) {
+                        // Rate limit exceeded, implement exponential backoff
+                        const delay = initialDelay * Math.pow(2, attempt);
+                        console.warn(`Rate limit exceeded (429). Retrying in ${delay / 1000}s...`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        attempt++;
+                        continue;
+                    }
+                    
+                    if (!response.ok) {
+                        throw new Error(`API call failed with status: ${response.status}`);
+                    }
+                    
+                    return await response.json();
+
+                } catch (error) {
+                    console.error('Error calling Gemini API:', error);
+                    // For other errors, stop execution
+                    throw error;
+                }
+            }
+            throw new Error("Failed to call Gemini API after multiple retries.");
+        }
+
+        // --- LLM Feature 1: AI Pro Tip Generation ---
+        async function getGeminiTip(score) {
+            const tipContainer = document.getElementById('geminiTipContainer');
+            const tipTextElement = document.getElementById('geminiTipText');
+            const tipSourcesElement = document.getElementById('geminiTipSources');
+            const loadingTip = document.getElementById('loadingTip');
+            
+            tipContainer.style.display = 'none';
+            loadingTip.style.display = 'block';
+
+            const userQuery = `I just scored ${score} in a simple Flappy Bird style game. Give me one very short, encouraging, and helpful pro tip or strategy point (2 sentences max) to improve my score.`;
+            const systemPrompt = "You are a friendly, encouraging retro gaming coach. Provide concise advice for a simple arcade game player.";
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                tools: [{ "google_search": {} }],
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                }
+            };
+
+            try {
+                const result = await callGeminiApi('gemini-2.5-flash-preview-09-2025', payload);
+                
+                let text = "Keep practicing! Patience is key to those high scores.";
+                let sourcesHtml = "";
+                
+                const candidate = result.candidates?.[0];
+
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    text = candidate.content.parts[0].text;
+                    
+                    // Extract sources
+                    const groundingMetadata = candidate.groundingMetadata;
+                    if (groundingMetadata && groundingMetadata.groundingAttributions) {
+                        const sources = groundingMetadata.groundingAttributions
+                            .map(attribution => ({
+                                uri: attribution.web?.uri,
+                                title: attribution.web?.title,
+                            }))
+                            .filter(source => source.uri && source.title);
+                            
+                        if (sources.length > 0) {
+                            sourcesHtml = 'Source: ' + sources.map((s, i) => 
+                                `<a href="${s.uri}" target="_blank" style="color:#80f000; text-decoration: underline;">[${i+1}]</a>`
+                            ).join(' ');
+                        }
+                    }
+                }
+
+                tipTextElement.textContent = text;
+                tipSourcesElement.innerHTML = sourcesHtml;
+                tipContainer.style.display = 'block';
+
+            } catch (error) {
+                tipTextElement.textContent = "AI Tip failed: Check console for errors.";
+                tipSourcesElement.textContent = "";
+                tipContainer.style.display = 'block';
+                console.error("Gemini Tip Generation failed:", error);
+            } finally {
+                loadingTip.style.display = 'none';
+            }
+        }
+
+        // --- LLM Feature 2: TTS Read Score ---
+        async function playGameOverSpeech() {
+            const ttsButton = document.getElementById('ttsButton');
+            const originalText = ttsButton.textContent;
+            
+            ttsButton.textContent = '... Speaking ...';
+            ttsButton.disabled = true;
+
+            const textToSpeak = `Game Over. Your final score is ${score}.`;
+            
+            const payload = {
+                contents: [{
+                    parts: [{ text: textToSpeak }]
+                }],
+                generationConfig: {
+                    responseModalities: ["AUDIO"],
+                    speechConfig: {
+                        voiceConfig: {
+                            prebuiltVoiceConfig: { voiceName: "Puck" } // Upbeat voice
+                        }
+                    }
+                },
+                model: "gemini-2.5-flash-preview-tts"
+            };
+
+            try {
+                const result = await callGeminiApi('gemini-2.5-flash-preview-tts', payload);
+                const part = result?.candidates?.[0]?.content?.parts?.[0];
+                const audioData = part?.inlineData?.data;
+                const mimeType = part?.inlineData?.mimeType;
+
+                if (audioData && mimeType && mimeType.startsWith("audio/L16")) {
+                    const sampleRateMatch = mimeType.match(/rate=(\d+)/);
+                    const sampleRate = sampleRateMatch ? parseInt(sampleRateMatch[1], 10) : 24000;
+                    
+                    const pcmData = base64ToArrayBuffer(audioData);
+                    const pcm16 = new Int16Array(pcmData);
+                    const wavBlob = pcmToWav(pcm16, sampleRate);
+                    const audioUrl = URL.createObjectURL(wavBlob);
+                    
+                    const audio = new Audio(audioUrl);
+                    audio.play();
+
+                    audio.onended = () => {
+                        ttsButton.textContent = originalText;
+                        ttsButton.disabled = false;
+                    };
+                } else {
+                    throw new Error("Invalid audio response format from TTS API.");
+                }
+
+            } catch (error) {
+                ttsButton.textContent = '❌ Audio Failed';
+                console.error("TTS Generation failed:", error);
+                setTimeout(() => {
+                    ttsButton.textContent = originalText;
+                    ttsButton.disabled = false;
+                }, 2000);
+            }
+        }
+
+
+        // --- GAME LOGIC ---
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const startOverlay = document.getElementById('gameStartOverlay');
+        const overOverlay = document.getElementById('gameOverOverlay');
+        const gameSettingsOverlay = document.getElementById('gameSettingsOverlay');
+        const finalScoreText = document.getElementById('finalScoreText');
+        const settingsCloseButton = document.getElementById('settingsCloseButton'); // Added ID selector
+
+        // Game State
+        let isGameRunning = false;
+        let isGameOver = false;
+        let wasGameRunningBeforeSettings = false; // NEW FLAG
+
+        // Customization State
+        let birdTheme = 'square'; // 'square', 'tomato', 'bear', 'mobile'
+        let isGravityInverted = false; // true if jump makes the bird go down
+
+        // Bird variables
+        let bird = {
+            x: 50,
+            y: canvas.height / 2,
+            size: 30, // Slightly larger for emojis
+            velocity: 0,
+            gravity: 0.4, // MODIFIED: Reduced for a slower fall/rise speed
+            jump: -8,     // REDUCED from -10
+            color: '#ffcc00' // Gold/Yellow
+        };
+
+        // Pipe variables
+        let pipes = [];
+        const pipeWidth = 40;
+        const pipeGap = 120; // Vertical gap
+        const pipeInterval = 100; // Frames between pipe spawns
+        const pipeSpeed = 1.5; // MODIFIED: Reduced from 2 for slower horizontal movement
+        let frameCount = 0;
+        let score = 0;
+
+        // --- Core Game Functions ---
+
+        function drawBird() {
+            // Draw based on the selected theme
+            if (birdTheme === 'square') {
+                ctx.fillStyle = bird.color;
+                // Draw the bird as a square
+                ctx.fillRect(bird.x, bird.y, bird.size, bird.size);
+                
+                // Optional: Draw a small eye for character
+                ctx.fillStyle = 'black';
+                ctx.fillRect(bird.x + bird.size - 8, bird.y + 8, 4, 4);
+            } else {
+                let emoji = '';
+                switch (birdTheme) {
+                    case 'tomato': emoji = '🍅'; break;
+                    case 'bear': emoji = '🐻'; break;
+                    case 'mobile': emoji = '📱'; break;
+                    default: emoji = '❓';
+                }
+                
+                // Draw the emoji (use a standard, larger font)
+                ctx.font = bird.size + 'px Arial'; 
+                ctx.textAlign = 'left';
+                // Adjust position since fillText starts at the baseline
+                ctx.fillText(emoji, bird.x, bird.y + bird.size - 5); 
+            }
+        }
+
+        function updateBird() {
+            if (isGameRunning) {
+                // Determine gravity direction based on setting
+                const currentGravity = isGravityInverted ? -bird.gravity : bird.gravity;
+                
+                // Apply gravity and update position
+                bird.velocity += currentGravity;
+                bird.y += bird.velocity;
+
+                // Ceiling and Floor collision
+                if (bird.y + bird.size > canvas.height || bird.y < 0) {
+                    endGame();
+                }
+            }
+        }
+
+        function drawPipes() {
+            ctx.fillStyle = '#059669'; // Darker Green for Pipes
+            for (let i = 0; i < pipes.length; i++) {
+                let p = pipes[i];
+
+                // North Pipe
+                ctx.fillRect(p.x, p.y, pipeWidth, p.northHeight);
+
+                // South Pipe
+                const southPipeY = p.y + p.northHeight + pipeGap;
+                const southPipeHeight = canvas.height - southPipeY;
+                ctx.fillRect(p.x, southPipeY, pipeWidth, southPipeHeight);
+            }
+        }
+
+        function updatePipes() {
+            if (!isGameRunning) return;
+
+            // Move pipes
+            for (let i = 0; i < pipes.length; i++) {
+                pipes[i].x -= pipeSpeed;
+            }
+
+            // Spawn new pipes
+            if (frameCount % pipeInterval === 0) {
+                const minHeight = 80;
+                const maxHeight = canvas.height - pipeGap - minHeight;
+                // Random height for the north pipe
+                let northHeight = Math.floor(Math.random() * (maxHeight - minHeight)) + minHeight;
+
+                pipes.push({
+                    x: canvas.width,
+                    y: 0,
+                    northHeight: northHeight,
+                    scored: false
+                });
+            }
+
+            // Remove off-screen pipes (optimization)
+            if (pipes.length > 0 && pipes[0].x < -pipeWidth) {
+                pipes.shift();
+            }
+        }
+
+        function checkCollisionAndScore() {
+            if (!isGameRunning) return;
+
+            for (let i = 0; i < pipes.length; i++) {
+                let p = pipes[i];
+
+                // 1. Collision Check (AABB)
+                const southPipeY = p.y + p.northHeight + pipeGap;
+
+                // Check if the bird is horizontally within the pipe's range
+                const horizontalOverlap = bird.x < p.x + pipeWidth && bird.x + bird.size > p.x;
+
+                // Check if the bird is vertically colliding with the top pipe OR the bottom pipe
+                const verticalCollision = bird.y < p.y + p.northHeight || bird.y + bird.size > southPipeY;
+                
+                if (horizontalOverlap && verticalCollision) {
+                    endGame();
+                    return; // Stop checking collisions
+                }
+                
+                // 2. Score Check
+                // If the pipe has passed the bird's X position and hasn't been scored yet
+                if (p.x + pipeWidth < bird.x && !p.scored) {
+                    score++;
+                    p.scored = true;
+                }
+            }
+        }
+
+        function drawScore() {
+            ctx.fillStyle = 'white';
+            ctx.font = '20px "Press Start 2P"';
+            ctx.fillText('Score: ' + score, 10, 30);
+        }
+
+        function gameLoop() {
+            if (!isGameRunning) return;
+
+            // 1. Clear Screen
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#70c5ce'; // Redraw sky background
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 2. Update Logic
+            updateBird();
+            updatePipes();
+            checkCollisionAndScore();
+            
+            // 3. Draw Elements
+            drawPipes();
+            drawBird();
+            drawScore();
+
+            frameCount++;
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- Settings and Game Control ---
+        
+        function jump() {
+            if (isGameRunning) {
+                // If gravity is normal (falls down), jump velocity is negative (pushes up)
+                // If gravity is inverted (rises up), jump velocity is positive (pushes down)
+                const currentJump = isGravityInverted ? -bird.jump : bird.jump;
+                bird.velocity = currentJump;
+            }
+        }
+
+        function startGame() {
+            startOverlay.style.display = 'none';
+            gameSettingsOverlay.style.display = 'none';
+            isGameRunning = true;
+            gameLoop();
+        }
+
+        function endGame() {
+            isGameRunning = false;
+            isGameOver = true;
+            overOverlay.style.display = 'flex';
+            finalScoreText.textContent = 'You scored ' + score + ' points!';
+            
+            // NEW: Initiate the LLM tip generation
+            getGeminiTip(score);
+        }
+
+        function resetGame() {
+            // Reset variables to initial state
+            bird.y = canvas.height / 2;
+            bird.velocity = 0;
+            pipes = [];
+            score = 0;
+            frameCount = 0;
+            isGameOver = false;
+            
+            // NEW: Clear LLM output area on reset
+            document.getElementById('geminiTipContainer').style.display = 'none';
+            document.getElementById('loadingTip').style.display = 'none';
+            document.getElementById('ttsButton').textContent = '🔊 Read Score';
+            document.getElementById('ttsButton').disabled = false;
+
+            overOverlay.style.display = 'none';
+            startGame(); // Automatically restarts the game
+        }
+
+        // --- Settings Functions ---
+        
+        function highlightSettingsButtons() {
+            // Bird Theme highlighting
+            document.querySelectorAll('#gameSettingsOverlay button').forEach(btn => {
+                if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes('setBirdTheme')) {
+                    const theme = btn.getAttribute('onclick').match(/'([^']*)'/)[1];
+                    btn.classList.toggle('selected-setting', theme === birdTheme);
+                }
+            });
+            
+            // Jump Direction highlighting
+            document.getElementById('jumpUpBtn').classList.toggle('selected-setting', !isGravityInverted);
+            document.getElementById('jumpDownBtn').classList.toggle('selected-setting', isGravityInverted);
+        }
+
+        function openSettings() {
+            // Store the state before pausing it
+            wasGameRunningBeforeSettings = isGameRunning; 
+
+            // Dynamic Button Text: Show APPLY & RESTART if game was active
+            if (wasGameRunningBeforeSettings) {
+                settingsCloseButton.textContent = 'APPLY & RESTART';
+            } else {
+                settingsCloseButton.textContent = 'CLOSE';
+            }
+            
+            startOverlay.style.display = 'none'; // Hide start screen if visible
+            overOverlay.style.display = 'none'; // Hide game over screen if visible
+            isGameRunning = false; // Pause the game
+            gameSettingsOverlay.style.display = 'flex';
+            
+            highlightSettingsButtons(); // Set initial button state
+        }
+
+        function closeSettings() {
+            gameSettingsOverlay.style.display = 'none';
+            
+            if (wasGameRunningBeforeSettings) {
+                // If they paused mid-game and are now closing settings, force a restart
+                wasGameRunningBeforeSettings = false; // Reset the flag
+                resetGame(); 
+            } else if (!isGameOver) {
+                // If they were on the start screen, just show the start screen
+                startOverlay.style.display = 'flex';
+            }
+        }
+
+        function setBirdTheme(theme) {
+            birdTheme = theme;
+            highlightSettingsButtons();
+            // Re-draw the initial state with the new bird in the center
+            if (!isGameRunning && !isGameOver) {
+                initialDraw();
+            }
+        }
+
+        function setJumpDirection(inverted) {
+            isGravityInverted = inverted;
+            highlightSettingsButtons();
+        }
+
+
+        // --- Event Listeners ---
+
+        // Keyboard Listener (Spacebar)
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !isGameOver && isGameRunning) {
+                e.preventDefault();
+                jump();
+            } else if (e.code === 'Space' && isGameOver) {
+                e.preventDefault();
+                resetGame();
+            }
+        });
+        
+        // Touch/Click Listener (Mobile/Mouse)
+        canvas.addEventListener('mousedown', jump);
+        canvas.addEventListener('touchstart', jump);
+        
+        // Initial Draw (only draws the bird in the center before start)
+        function initialDraw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#70c5ce';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw bird for the initial screen
+            bird.y = canvas.height / 2; // Keep bird centered for preview
+            drawBird();
+
+            if (!isGameRunning && !isGameOver) {
+                requestAnimationFrame(initialDraw);
+            }
+        }
+        
+        // Start the initial draw when the window is loaded
+        window.onload = function() {
+            initialDraw();
+            highlightSettingsButtons(); // Ensure buttons are highlighted on load
+        }
+    </script>
+</body>
+</html>
